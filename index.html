@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบเฝ้าระวังความขุ่นของน้ำ | Smart Farm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0B2E33;
+    --panel: #123B42;
+    --panel-2: #16454C;
+    --line: rgba(234,243,241,0.09);
+    --clear: #6FE7DD;
+    --murky: #B98A54;
+    --alert: #E8A33D;
+    --danger: #E2694B;
+    --text: #EAF3F1;
+    --text-dim: #8FB4B0;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(111,231,221,0.08), transparent),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(185,138,84,0.06), transparent),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    min-height:100vh;
+    padding:32px 20px 80px;
+  }
+  .wrap{max-width:980px; margin:0 auto;}
+
+  header{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:36px; flex-wrap:wrap;}
+  .eyebrow{font-family:var(--font-mono); font-size:12px; letter-spacing:0.14em; color:var(--clear); text-transform:uppercase;}
+  h1{font-family:var(--font-display); font-weight:600; font-size:26px; margin-top:6px; letter-spacing:-0.01em;}
+  .conn{display:flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:12px; color:var(--text-dim); padding:8px 14px; border:1px solid var(--line); border-radius:100px; background:rgba(255,255,255,0.02);}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--text-dim); transition:background .3s;}
+  .dot.on{background:var(--clear); box-shadow:0 0 10px var(--clear);}
+  .dot.off{background:var(--danger);}
+
+  .hero{
+    display:grid;
+    grid-template-columns:1.1fr 1fr;
+    gap:0;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:20px;
+    overflow:hidden;
+    margin-bottom:24px;
+  }
+  @media (max-width: 720px){ .hero{grid-template-columns:1fr;} }
+
+  .vial-side{
+    display:flex; align-items:center; justify-content:center;
+    padding:36px 20px;
+    background:linear-gradient(180deg, rgba(0,0,0,0.15), transparent);
+    border-right:1px solid var(--line);
+  }
+  @media (max-width: 720px){ .vial-side{border-right:none; border-bottom:1px solid var(--line);} }
+
+  .reading-side{padding:36px 32px; display:flex; flex-direction:column; justify-content:center; gap:18px;}
+  .reading-label{font-family:var(--font-mono); font-size:12px; color:var(--text-dim); letter-spacing:0.1em; text-transform:uppercase;}
+  .reading-value{font-family:var(--font-display); font-size:64px; font-weight:700; line-height:1; letter-spacing:-0.02em; display:flex; align-items:baseline; gap:10px;}
+  .reading-value span.unit{font-family:var(--font-mono); font-size:20px; font-weight:500; color:var(--text-dim);}
+  .status-pill{display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:100px; font-family:var(--font-mono); font-size:12px; width:fit-content; letter-spacing:0.03em;}
+  .status-pill.clear{background:rgba(111,231,221,0.12); color:var(--clear); border:1px solid rgba(111,231,221,0.25);}
+  .status-pill.murky{background:rgba(226,105,75,0.14); color:var(--danger); border:1px solid rgba(226,105,75,0.3);}
+  .updated{font-family:var(--font-mono); font-size:11px; color:var(--text-dim);}
+
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
+  @media (max-width: 720px){ .grid{grid-template-columns:1fr;} }
+
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:26px 28px;}
+  .card h2{font-family:var(--font-display); font-size:16px; font-weight:600; margin-bottom:4px;}
+  .card p.desc{font-size:13px; color:var(--text-dim); margin-bottom:18px; line-height:1.5;}
+
+  .threshold-row{display:flex; gap:10px; align-items:stretch;}
+  input[type=number]{
+    flex:1; background:var(--panel-2); border:1px solid var(--line); border-radius:10px;
+    color:var(--text); font-family:var(--font-mono); font-size:16px; padding:12px 14px;
+  }
+  input[type=number]:focus{outline:none; border-color:var(--clear);}
+  button{
+    font-family:var(--font-body); font-weight:600; font-size:13px; border:none; border-radius:10px;
+    padding:12px 18px; cursor:pointer; transition:transform .15s, opacity .15s;
+  }
+  button:active{transform:scale(0.97);}
+  .btn-primary{background:var(--clear); color:#062225;}
+  .btn-primary:hover{opacity:0.9;}
+  .threshold-current{margin-top:14px; font-family:var(--font-mono); font-size:12px; color:var(--text-dim);}
+  .threshold-current b{color:var(--text); font-size:14px;}
+
+  .servo-visual{display:flex; align-items:center; justify-content:center; gap:22px; margin-bottom:16px;}
+  .servo-state{text-align:center;}
+  .servo-state .label{font-family:var(--font-mono); font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em;}
+  .servo-state .value{font-family:var(--font-display); font-size:22px; font-weight:600; margin-top:4px;}
+  .log{margin-top:10px; font-family:var(--font-mono); font-size:12px; color:var(--text-dim); line-height:1.7; max-height:120px; overflow-y:auto;}
+  .log div{border-top:1px dashed var(--line); padding:6px 0;}
+  .log div:first-child{border-top:none;}
+
+  footer{margin-top:36px; text-align:center; font-family:var(--font-mono); font-size:11px; color:var(--text-dim);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <div class="eyebrow">Smart Farm · ESP32-WROOM-32</div>
+      <h1>ระบบเฝ้าระวังความขุ่นของน้ำ</h1>
+    </div>
+    <div class="conn"><span class="dot off" id="connDot"></span><span id="connText">กำลังเชื่อมต่อ Firebase…</span></div>
+  </header>
+
+  <div class="hero">
+    <div class="vial-side">
+      <svg id="vialSvg" width="180" height="260" viewBox="0 0 180 260">
+        <defs>
+          <filter id="murk" x="-50%" y="-50%" width="200%" height="200%">
+            <feTurbulence id="turb" type="fractalNoise" baseFrequency="0.01" numOctaves="2" seed="7" result="noise"/>
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="6"/>
+          </filter>
+          <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop id="gradTop" offset="0%" stop-color="#6FE7DD"/>
+            <stop id="gradBottom" offset="100%" stop-color="#2E7C77"/>
+          </linearGradient>
+          <clipPath id="jarClip">
+            <path d="M55 20 H125 V40 Q150 45 150 90 V225 Q150 250 120 250 H60 Q30 250 30 225 V90 Q30 45 55 40 Z"/>
+          </clipPath>
+        </defs>
+        <path d="M55 20 H125 V40 Q150 45 150 90 V225 Q150 250 120 250 H60 Q30 250 30 225 V90 Q30 45 55 40 Z"
+              fill="none" stroke="rgba(234,243,241,0.35)" stroke-width="3"/>
+        <g clip-path="url(#jarClip)">
+          <rect id="waterLevel" x="20" y="120" width="140" height="140" fill="url(#waterGrad)" filter="url(#murk)"/>
+        </g>
+        <rect x="65" y="8" width="50" height="14" rx="4" fill="rgba(234,243,241,0.35)"/>
+      </svg>
+    </div>
+    <div class="reading-side">
+      <div class="reading-label">ค่าความขุ่นปัจจุบัน</div>
+      <div class="reading-value"><span id="turbidityValue">--</span><span class="unit">ADC</span></div>
+      <div class="status-pill clear" id="statusPill">รอข้อมูลจากเซนเซอร์</div>
+      <div class="updated" id="updatedAt">อัปเดตล่าสุด: --</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>ตั้งค่าระดับความขุ่น</h2>
+      <p class="desc">กำหนดค่า ADC ดิบ (0-4095) ที่ใช้เทียบกับเซนเซอร์ — เมื่อค่าที่วัดได้ต่ำกว่าค่านี้ ระบบจะสั่งเปลี่ยนน้ำโดยอัตโนมัติ</p>
+      <div class="threshold-row">
+        <input type="number" id="thresholdInput" placeholder="เช่น 200" step="1">
+        <button class="btn-primary" id="saveThreshold">บันทึกค่า</button>
+      </div>
+      <div class="threshold-current">ค่าที่ตั้งไว้ในระบบ: <b id="currentThreshold">--</b> ADC</div>
+    </div>
+
+    <div class="card">
+      <h2>สถานะการเปลี่ยนน้ำ (เซอร์โว)</h2>
+      <p class="desc">เซอร์โวหมุนไป 90° เพื่อเปิดวาล์วเปลี่ยนน้ำเมื่อค่าความขุ่นต่ำกว่าค่าที่ตั้งไว้</p>
+      <div class="servo-visual">
+        <div class="servo-state">
+          <div class="label">สถานะ</div>
+          <div class="value" id="servoState">IDLE</div>
+        </div>
+        <div class="servo-state">
+          <div class="label">องศาปัจจุบัน</div>
+          <div class="value" id="servoAngle">0°</div>
+        </div>
+      </div>
+      <div class="log" id="eventLog"><div>ยังไม่มีเหตุการณ์</div></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px;">
+    <h2>ประวัติค่าความขุ่นย้อนหลัง</h2>
+    <p class="desc">ค่า ADC ที่บันทึกล่าสุด 30 จุด — เส้นยิ่งต่ำ ยิ่งขุ่น เส้นประคือระดับที่ตั้งไว้</p>
+    <canvas id="historyChart" width="900" height="220" style="width:100%; height:220px; display:block;"></canvas>
+  </div>
+
+  <footer>project-ns-ffe60 · Firebase Realtime Database · asia-southeast1</footer>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+  // ---- Firebase config (จากที่ให้มา) ----
+  const firebaseConfig = {
+    apiKey: "AIzaSyArY88WloHBvco4lf5CTSCSkMrbGzOUx8Q",
+    authDomain: "project-ns-ffe60.firebaseapp.com",
+    databaseURL: "https://project-ns-ffe60-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "project-ns-ffe60",
+    storageBucket: "project-ns-ffe60.firebasestorage.app",
+    messagingSenderId: "770338461085",
+    appId: "1:770338461085:web:4763f403702b8448eb0b74",
+    measurementId: "G-5BCZPXTW3W"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // ต้อง sign in ก่อน เพราะ Database Rules ตั้งไว้ว่า auth != null
+  // (ต้องเปิดใช้งาน Anonymous ใน Firebase Console > Authentication > Sign-in method)
+  firebase.auth().signInAnonymously().catch(err => {
+    console.error('Sign-in ผิดพลาด:', err);
+    document.getElementById('connText').textContent = 'เข้าสู่ระบบไม่สำเร็จ: ' + err.message;
+  });
+
+  firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+      startListeners();
+    }
+  });
+
+  // ---- โครงสร้างข้อมูลใน Realtime Database ----
+  // /sensor/turbidity      -> ค่า NTU ล่าสุดจาก ESP32
+  // /sensor/updatedAt      -> timestamp (ms) ล่าสุด
+  // /control/threshold     -> ค่าที่ตั้งไว้จากหน้าเว็บ, ESP32 อ่านค่านี้ไปเทียบ
+  // /control/servoState    -> "IDLE" | "CHANGING"
+  // /control/servoAngle    -> องศาปัจจุบันของเซอร์โว
+  // /control/log/{pushId}  -> เหตุการณ์การเปลี่ยนน้ำ {message, time}
+
+  const refTurbidity = db.ref('sensor/turbidity');
+  const refUpdatedAt = db.ref('sensor/updatedAt');
+  const refThreshold = db.ref('control/threshold');
+  const refServoState = db.ref('control/servoState');
+  const refServoAngle = db.ref('control/servoAngle');
+  const refLog = db.ref('control/log');
+  const refHistory = db.ref('sensor/history');
+
+  const connDot = document.getElementById('connDot');
+  const connText = document.getElementById('connText');
+  db.ref('.info/connected').on('value', snap => {
+    const on = snap.val() === true;
+    connDot.className = 'dot ' + (on ? 'on' : 'off');
+    connText.textContent = on ? 'เชื่อมต่อ Firebase สำเร็จ' : 'ขาดการเชื่อมต่อ';
+  });
+
+  function setWaterVisual(value, thresholdVal){
+    const clamped = Math.max(0, Math.min(1000, value));
+    const level = 120 + (1 - clamped/1000) * 0; // fixed level, murkiness communicates value instead
+    const gradTop = document.getElementById('gradTop');
+    const gradBottom = document.getElementById('gradBottom');
+    const turb = document.getElementById('turb');
+    const isMurky = thresholdVal !== null && value < thresholdVal;
+    if(isMurky){
+      gradTop.setAttribute('stop-color', '#C79A5E');
+      gradBottom.setAttribute('stop-color', '#5C4526');
+    } else {
+      gradTop.setAttribute('stop-color', '#6FE7DD');
+      gradBottom.setAttribute('stop-color', '#2E7C77');
+    }
+    const freq = 0.005 + Math.min(clamped, 1000)/1000 * 0.045;
+    turb.setAttribute('baseFrequency', freq.toFixed(3));
+  }
+
+  function drawHistoryChart(points, thresholdVal){
+    const canvas = document.getElementById('historyChart');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+    if(points.length < 2) return;
+
+    const values = points.map(p => p.value);
+    let min = Math.min(...values, thresholdVal ?? Infinity);
+    let max = Math.max(...values, thresholdVal ?? -Infinity);
+    if(min === max){ min -= 10; max += 10; }
+    const pad = (max - min) * 0.1;
+    min -= pad; max += pad;
+
+    const marginL = 44, marginR = 12, marginT = 12, marginB = 24;
+    const plotW = W - marginL - marginR;
+    const plotH = H - marginT - marginB;
+    const xStep = plotW / (points.length - 1);
+    const yFor = v => marginT + plotH - ((v - min) / (max - min)) * plotH;
+
+    // grid + axis labels
+    ctx.strokeStyle = 'rgba(234,243,241,0.08)';
+    ctx.fillStyle = '#8FB4B0';
+    ctx.font = '11px JetBrains Mono, monospace';
+    ctx.textAlign = 'right';
+    for(let i=0;i<=3;i++){
+      const v = min + (max-min) * (i/3);
+      const y = yFor(v);
+      ctx.beginPath(); ctx.moveTo(marginL, y); ctx.lineTo(W-marginR, y); ctx.stroke();
+      ctx.fillText(Math.round(v), marginL-8, y+3);
+    }
+
+    // threshold dashed line
+    if(thresholdVal !== null){
+      const ty = yFor(thresholdVal);
+      ctx.save();
+      ctx.setLineDash([5,5]);
+      ctx.strokeStyle = '#E8A33D';
+      ctx.beginPath(); ctx.moveTo(marginL, ty); ctx.lineTo(W-marginR, ty); ctx.stroke();
+      ctx.restore();
+    }
+
+    // line
+    ctx.beginPath();
+    ctx.strokeStyle = '#6FE7DD';
+    ctx.lineWidth = 2;
+    points.forEach((p,i) => {
+      const x = marginL + i*xStep;
+      const y = yFor(p.value);
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+
+    // fill under line
+    ctx.lineTo(marginL + (points.length-1)*xStep, marginT+plotH);
+    ctx.lineTo(marginL, marginT+plotH);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(111,231,221,0.08)';
+    ctx.fill();
+
+    // last point dot
+    const lastX = marginL + (points.length-1)*xStep;
+    const lastY = yFor(points[points.length-1].value);
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 4, 0, Math.PI*2);
+    ctx.fillStyle = '#6FE7DD';
+    ctx.fill();
+  }
+
+  let lastHistoryPoints = [];
+  let latestThreshold = null;
+
+  function startListeners() {
+
+  refTurbidity.on('value', snap => {
+    const val = snap.val();
+    document.getElementById('turbidityValue').textContent = (val === null) ? '--' : val;
+    const pill = document.getElementById('statusPill');
+    if(val !== null && latestThreshold !== null){
+      if(val < latestThreshold){
+        pill.textContent = 'น้ำขุ่น — ต่ำกว่าค่าที่ตั้งไว้';
+        pill.className = 'status-pill murky';
+      } else {
+        pill.textContent = 'น้ำใส — อยู่ในเกณฑ์ปกติ';
+        pill.className = 'status-pill clear';
+      }
+    }
+    setWaterVisual(val ?? 0, latestThreshold);
+  });
+
+  refUpdatedAt.on('value', snap => {
+    const t = snap.val();
+    if(t){
+      const d = new Date(t);
+      document.getElementById('updatedAt').textContent = 'อัปเดตล่าสุด: ' + d.toLocaleString('th-TH');
+    }
+  });
+
+  refThreshold.on('value', snap => {
+    const t = snap.val();
+    latestThreshold = t;
+    document.getElementById('currentThreshold').textContent = (t === null) ? '--' : t;
+    document.getElementById('thresholdInput').placeholder = (t === null) ? 'เช่น 200' : t;
+    if(lastHistoryPoints.length) drawHistoryChart(lastHistoryPoints, latestThreshold);
+  });
+
+  refHistory.limitToLast(30).on('value', snap => {
+    const points = [];
+    snap.forEach(child => {
+      const e = child.val();
+      if(typeof e.value === 'number') points.push({ value: e.value, time: e.time });
+    });
+    lastHistoryPoints = points;
+    drawHistoryChart(points, latestThreshold);
+  });
+
+  document.getElementById('saveThreshold').addEventListener('click', () => {
+    const input = document.getElementById('thresholdInput');
+    const v = parseFloat(input.value);
+    if(isNaN(v)){ input.focus(); return; }
+    refThreshold.set(v);
+    input.value = '';
+  });
+
+  refServoState.on('value', snap => {
+    document.getElementById('servoState').textContent = snap.val() || 'IDLE';
+  });
+  refServoAngle.on('value', snap => {
+    document.getElementById('servoAngle').textContent = (snap.val() ?? 0) + '°';
+  });
+
+  refLog.limitToLast(8).on('value', snap => {
+    const logEl = document.getElementById('eventLog');
+    const entries = [];
+    snap.forEach(child => {
+      const e = child.val();
+      const time = e.time ? new Date(e.time).toLocaleTimeString('th-TH') : '';
+      entries.push(`<div>[${time}] ${e.message}</div>`);
+    });
+    logEl.innerHTML = entries.length ? entries.reverse().join('') : '<div>ยังไม่มีเหตุการณ์</div>';
+  });
+
+  } // end startListeners
+</script>
+</body>
+</html>
