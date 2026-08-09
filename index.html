@@ -175,6 +175,24 @@
       </div>
       <div class="log" id="eventLog"><div>ยังไม่มีเหตุการณ์</div></div>
     </div>
+
+    <div class="card">
+      <h2>ระดับน้ำในถัง</h2>
+      <p class="desc">วัดจากเซนเซอร์ HC-SR04 (อัลตราโซนิก) แบบเรียลไทม์</p>
+      <div class="servo-visual">
+        <div class="servo-state">
+          <div class="label">ระดับน้ำ</div>
+          <div class="value" id="waterLevelCm">-- cm</div>
+        </div>
+        <div class="servo-state">
+          <div class="label">คิดเป็น %</div>
+          <div class="value" id="waterLevelPercent">--%</div>
+        </div>
+      </div>
+      <div style="background:var(--panel-2); border-radius:10px; height:14px; overflow:hidden; margin-top:6px;">
+        <div id="waterLevelBar" style="height:100%; width:0%; background:linear-gradient(90deg,#2E7C77,#6FE7DD); transition:width .4s;"></div>
+      </div>
+    </div>
   </div>
 
   <div class="card" style="margin-top:20px;">
@@ -232,6 +250,8 @@
   const refServoAngle = db.ref('control/servoAngle');
   const refLog = db.ref('control/log');
   const refHistory = db.ref('sensor/history');
+  const refWaterLevelCm = db.ref('sensor/waterLevelCm');
+  const refWaterLevelPercent = db.ref('sensor/waterLevelPercent');
 
   const connDot = document.getElementById('connDot');
   const connText = document.getElementById('connText');
@@ -388,6 +408,16 @@
   });
   refServoAngle.on('value', snap => {
     document.getElementById('servoAngle').textContent = (snap.val() ?? 0) + '°';
+  });
+
+  refWaterLevelCm.on('value', snap => {
+    const v = snap.val();
+    document.getElementById('waterLevelCm').textContent = (v === null) ? '-- cm' : v.toFixed(1) + ' cm';
+  });
+  refWaterLevelPercent.on('value', snap => {
+    const p = snap.val();
+    document.getElementById('waterLevelPercent').textContent = (p === null) ? '--%' : Math.round(p) + '%';
+    document.getElementById('waterLevelBar').style.width = (p === null ? 0 : Math.min(100, Math.max(0, p))) + '%';
   });
 
   refLog.limitToLast(8).on('value', snap => {
