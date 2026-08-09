@@ -92,6 +92,9 @@
   button:active{transform:scale(0.97);}
   .btn-primary{background:var(--clear); color:#062225;}
   .btn-primary:hover{opacity:0.9;}
+  .btn-secondary{background:var(--panel-2); color:var(--text); border:1px solid var(--line);}
+  .btn-secondary:hover{opacity:0.85;}
+  .mode-row{display:flex; align-items:center; gap:10px;}
   .threshold-current{margin-top:14px; font-family:var(--font-mono); font-size:12px; color:var(--text-dim);}
   .threshold-current b{color:var(--text); font-size:14px;}
 
@@ -178,7 +181,7 @@
 
     <div class="card">
       <h2>ระดับน้ำในถัง</h2>
-      <p class="desc">วัดจากเซนเซอร์ HC-SR04 (อัลตราโซนิก) แบบเรียลไทม์</p>
+      <p class="desc">วัดจากเซนเซอร์ HC-SR04 (อัลตราโซนิก) แบบเรียลไทม์ — ตั้งความสูงถังให้ตรงกับของจริงเพื่อผลลัพธ์ที่แม่นยำขึ้น</p>
       <div class="servo-visual">
         <div class="servo-state">
           <div class="label">ระดับน้ำ</div>
@@ -192,6 +195,30 @@
       <div style="background:var(--panel-2); border-radius:10px; height:14px; overflow:hidden; margin-top:6px;">
         <div id="waterLevelBar" style="height:100%; width:0%; background:linear-gradient(90deg,#2E7C77,#6FE7DD); transition:width .4s;"></div>
       </div>
+      <div class="threshold-row" style="margin-top:16px;">
+        <input type="number" id="tankHeightInput" placeholder="เช่น 30 (ซม.)" step="0.5" min="5">
+        <button class="btn-primary" id="saveTankHeight">บันทึกความสูงถัง</button>
+      </div>
+      <div class="threshold-current">ความสูงถังที่ตั้งไว้ (เซนเซอร์ถึงก้นถัง): <b id="currentTankHeight">--</b> ซม.</div>
+    </div>
+
+    <div class="card">
+      <h2>ควบคุมน้ำด้วยตนเอง</h2>
+      <p class="desc">สั่งเปิด/ปิดวาล์วน้ำเองจากหน้าเว็บ หรือกำหนดเวลาปล่อยน้ำเพื่อคุมปริมาณ โดยไม่ต้องรอระบบอัตโนมัติ</p>
+      <div class="mode-row">
+        <span class="reading-label">โหมดการทำงาน:</span>
+        <span class="status-pill clear" id="modePill">AUTO</span>
+      </div>
+      <div class="threshold-row" style="margin-top:14px;">
+        <button class="btn-primary" id="btnOpenValve">เปิดวาล์ว</button>
+        <button class="btn-secondary" id="btnCloseValve">ปิดวาล์ว</button>
+      </div>
+      <div class="threshold-row" style="margin-top:10px;">
+        <input type="number" id="waterDurationInput" placeholder="เช่น 10 (วินาที)" step="1" min="1">
+        <button class="btn-primary" id="btnWaterTimed">รดน้ำตามเวลา</button>
+      </div>
+      <div class="threshold-current">ปล่อยน้ำครั้งล่าสุด: <b id="waterAmountEstimate">--</b></div>
+      <button class="btn-secondary" id="btnBackToAuto" style="margin-top:14px; width:100%;">กลับสู่โหมดอัตโนมัติ</button>
     </div>
   </div>
 
@@ -252,6 +279,11 @@
   const refHistory = db.ref('sensor/history');
   const refWaterLevelCm = db.ref('sensor/waterLevelCm');
   const refWaterLevelPercent = db.ref('sensor/waterLevelPercent');
+  const refMode = db.ref('control/mode');
+  const refManualAngle = db.ref('control/manualAngle');
+  const refManualDuration = db.ref('control/manualDurationSec');
+  const refManualCommandTs = db.ref('control/manualCommandTs');
+  const refTankHeight = db.ref('control/tankHeightCm');
 
   const connDot = document.getElementById('connDot');
   const connText = document.getElementById('connText');
@@ -418,6 +450,64 @@
     const p = snap.val();
     document.getElementById('waterLevelPercent').textContent = (p === null) ? '--%' : Math.round(p) + '%';
     document.getElementById('waterLevelBar').style.width = (p === null ? 0 : Math.min(100, Math.max(0, p))) + '%';
+  });
+
+  refTankHeight.on('value', snap => {
+    const h = snap.val();
+    document.getElementById('currentTankHeight').textContent = (h === null) ? '--' : h;
+    document.getElementById('tankHeightInput').placeholder = (h === null) ? 'เช่น 30 (ซม.)' : h;
+  });
+
+  document.getElementById('saveTankHeight').addEventListener('click', () => {
+    const input = document.getElementById('tankHeightInput');
+    const v = parseFloat(input.value);
+    if(isNaN(v) || v <= 0){ input.focus(); return; }
+    refTankHeight.set(v);
+    input.value = '';
+  });
+
+  // ---- ควบคุมน้ำด้วยตนเอง ----
+  refMode.on('value', snap => {
+    const m = snap.val() || 'AUTO';
+    const pill = document.getElementById('modePill');
+    if(m === 'MANUAL'){
+      pill.textContent = 'MANUAL — ควบคุมเอง';
+      pill.className = 'status-pill murky';
+    } else {
+      pill.textContent = 'AUTO — อัตโนมัติ';
+      pill.className = 'status-pill clear';
+    }
+  });
+
+  function sendManualCommand(angle, durationSec){
+    refMode.set('MANUAL');
+    refManualAngle.set(angle);
+    refManualDuration.set(durationSec);
+    refManualCommandTs.set(Date.now());
+  }
+
+  document.getElementById('btnOpenValve').addEventListener('click', () => {
+    sendManualCommand(90, 0); // เปิดค้างไว้จนกว่าจะสั่งปิดเอง
+    document.getElementById('waterAmountEstimate').textContent = 'เปิดค้างไว้ (สั่งเปิดเอง)';
+  });
+
+  document.getElementById('btnCloseValve').addEventListener('click', () => {
+    sendManualCommand(0, 0);
+    document.getElementById('waterAmountEstimate').textContent = 'ปิดวาล์ว (สั่งปิดเอง)';
+  });
+
+  document.getElementById('btnWaterTimed').addEventListener('click', () => {
+    const input = document.getElementById('waterDurationInput');
+    const sec = parseInt(input.value, 10);
+    if(isNaN(sec) || sec <= 0){ input.focus(); return; }
+    sendManualCommand(90, sec);
+    document.getElementById('waterAmountEstimate').textContent = 'เปิดวาล์ว ' + sec + ' วินาที';
+    input.value = '';
+  });
+
+  document.getElementById('btnBackToAuto').addEventListener('click', () => {
+    refMode.set('AUTO');
+    document.getElementById('waterAmountEstimate').textContent = 'กลับสู่โหมดอัตโนมัติ';
   });
 
   refLog.limitToLast(8).on('value', snap => {
